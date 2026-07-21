@@ -9,7 +9,6 @@ st.title("Generador de Scoring Financiero")
 cliente = st.text_input("Nombre del Cliente")
 ruc = st.text_input("RUC")
 fecha_inicio = st.date_input("Fecha de Inicio de Actividad")
-infocorp = st.number_input("Score Infocorp", min_value=0, max_value=999)
 
 archivos = {
     "2023": st.file_uploader("Subir DJ 2023", type="pdf"),
