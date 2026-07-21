@@ -29,7 +29,6 @@ if st.button("Generar Excel"):
             ws_final["C2"] = cliente
             ws_final["C3"] = ruc
             ws_final["C4"] = str(fecha_inicio)
-            ws_final["D4"] = infocorp
         
         # 2. Procesar los estados financieros
         for anio, archivo in archivos.items():
