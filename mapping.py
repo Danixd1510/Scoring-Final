@@ -1,4 +1,7 @@
 # Mapeo: { "Casilla_PDF": "Celda_Excel" }
+# Se han eliminado las casillas que son "Totales" o "Resultados Calculados"
+# para proteger las fórmulas de tu Excel.
+
 MAPEO_CASILLAS = {
     # --- BALANCE GENERAL (ACTIVO) ---
     "359": "B4", "360": "B5", "361": "B6", "362": "B7", "363": "B8",
@@ -16,11 +19,8 @@ MAPEO_CASILLAS = {
     "418": "D22", "419": "D23", "420": "D24", "421": "D25", "422": "D26",
     "423": "D27", "424": "D28",
 
-    # --- ESTADO DE RESULTADOS (COLUMNA C) ---
-    "461": "C42", "462": "C43", "463": "C44", "464": "C45", "466": "C46",
-    "467": "C47", "468": "C48", "469": "C49", "470": "C50", "471": "C51",
+    # --- ESTADO DE RESULTADOS (SOLO VALORES NO CALCULADOS) ---
+    "461": "C42", "462": "C43", "464": "C45", "468": "C48", "469": "C49",
     "472": "C52", "473": "C53", "475": "C54", "476": "C55", "477": "C56",
-    "478": "C57", "480": "C58", "481": "C59", "484": "C61", "485": "C62",
-    "486": "C63", "487": "C64", "489": "C65", "490": "C66", "492": "C67",
-    "493": "C68"
+    "478": "C57", "480": "C58", "481": "C59"
 }
