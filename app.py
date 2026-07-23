@@ -3,8 +3,8 @@ import openpyxl
 from utils import extraer_datos_de_pdf
 from mapping import MAPEO_CASILLAS
 
-st.set_page_config(page_title="SACA TUS RATIOS RAPIDISIMOOOO")
-st.title("Generador de Scoring Financiero")
+st.set_page_config(page_title="Scoring Financiero")
+st.title("SACA TUS RATIOS RAPIDISIMOOOO")
 
 # Solo nombre del cliente
 cliente = st.text_input("Nombre del Cliente")
