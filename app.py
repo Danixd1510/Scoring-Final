@@ -3,45 +3,34 @@ import openpyxl
 from utils import extraer_datos_de_pdf
 from mapping import MAPEO_CASILLAS
 
-st.set_page_config(page_title="Scoring Automático")
-
-# Inicialización de estado para limpiar campos
-if 'cliente' not in st.session_state: st.session_state.cliente = ""
-if 'ruc' not in st.session_state: st.session_state.ruc = ""
-
+st.set_page_config(page_title="SACA TUS RATIOS RAPIDISIMOOOO")
 st.title("Generador de Scoring Financiero")
 
-cliente = st.text_input("Nombre del Cliente", key="cliente")
-ruc = st.text_input("RUC", key="ruc")
-fecha = st.text_input("Fecha Inicio (dd/mm/aaaa)")
-infocorp = st.number_input("Score Infocorp", min_value=0, max_value=999)
+# Solo nombre del cliente
+cliente = st.text_input("Nombre del Cliente")
 
 # Archivos opcionales
-pdf_2023 = st.file_uploader("Subir PDF 2023")
-pdf_2024 = st.file_uploader("Subir PDF 2024")
-pdf_2025 = st.file_uploader("Subir PDF 2025")
+pdf_2023 = st.file_uploader("Subir DDJJ 2023")
+pdf_2024 = st.file_uploader("Subir DDJJ 2024")
+pdf_2025 = st.file_uploader("Subir DDJJ 2025")
 
 archivos = {"2023": pdf_2023, "2024": pdf_2024, "2025": pdf_2025}
 
 def limpiar_nombre(nombre):
+    # Elimina puntos para dejar S.A.C -> SAC
     return nombre.replace(".", "")
 
 if st.button("Generar Excel"):
     if not cliente:
-        st.error("Ingresa el nombre del cliente")
+        st.error("Por favor ingresa el nombre del cliente")
     else:
         wb = openpyxl.load_workbook("Scoring Final.xlsx")
-        # Escribir Cabecera
-        if "SCORING_FINAL" in wb.sheetnames:
-            ws_f = wb["SCORING_FINAL"]
-            ws_f["C2"] = limpiar_nombre(cliente)
-            ws_f["C3"] = ruc
-            ws_f["C4"] = fecha
-            ws_f["D4"] = infocorp
         
-        # Procesar
+        # Procesar archivos
+        al_menos_uno = False
         for anio, archivo in archivos.items():
             if archivo and anio in wb.sheetnames:
+                al_menos_uno = True
                 ws = wb[anio]
                 datos = extraer_datos_de_pdf(archivo)
                 for casilla, valor in datos.items():
@@ -52,14 +41,17 @@ if st.button("Generar Excel"):
                             ws[celda].number_format = '_("S/"* #,##0.00_);_("S/"* (#,##0.00);_("S/"* "-"??_);_(@_)'
                         else:
                             ws[celda] = ""
-
+        
+        if not al_menos_uno:
+            st.warning("No se subió ningún archivo, se descargará la plantilla vacía.")
+            
         nombre_final = f"Scoring Final - {limpiar_nombre(cliente)}.xlsx"
         wb.save(nombre_final)
+        
         with open(nombre_final, "rb") as f:
             st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
 
 # Botón de Refresh
 if st.button("Limpiar"):
-    for key in st.session_state.keys():
-        del st.session_state[key]
+    st.session_state.clear()
     st.rerun()
