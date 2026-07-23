@@ -59,7 +59,7 @@ if st.button("Generar Excel"):
             st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
 
 # Botón de Refresh
-if st.button("Limpiar / Nuevo Cliente"):
+if st.button("Limpiar"):
     for key in st.session_state.keys():
         del st.session_state[key]
     st.rerun()
