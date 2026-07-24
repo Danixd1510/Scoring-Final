@@ -1,32 +1,39 @@
-import pdfplumber
+import pymupdf4llm
+import re
 from mapping import MAPEO_CASILLAS
 
 def limpiar_valor(valor):
     if valor is None: return 0
-    # Limpiamos caracteres extraños y paréntesis para negativos
-    val_str = str(valor).strip().replace('(', '-').replace(')', '').replace(',', '')
+    # Limpieza: quitamos espacios, comas, y paréntesis a negativos
+    clean = str(valor).strip().replace(' ', '').replace(',', '').replace('(', '-').replace(')', '')
     try:
-        return float(val_str)
+        return float(clean)
     except:
         return 0
 
 def extraer_datos_de_pdf(archivo_pdf):
+    # Convertimos el PDF a Markdown
+    # pymupdf4llm nos da un texto limpio y estructurado
+    md_text = pymupdf4llm.to_markdown(archivo_pdf)
+    
     datos_extraidos = {}
-    with pdfplumber.open(archivo_pdf) as pdf:
-        for page in pdf.pages:
-            table = page.extract_table()
-            if table:
-                for row in table:
-                    # Limpiamos la fila de Nones para poder iterar bien
-                    row_limpia = [str(cell).strip() if cell is not None else "" for cell in row]
-                    
-                    # Buscamos la casilla en la fila
-                    for i, cell in enumerate(row_limpia):
-                        if cell in MAPEO_CASILLAS:
-                            # SEGURIDAD: Solo intentamos leer el valor si existe una columna a la derecha
-                            if i + 1 < len(row_limpia):
-                                valor = row_limpia[i+1]
-                                # Solo procesamos si el valor no está vacío
-                                if valor:
-                                    datos_extraidos[cell] = limpiar_valor(valor)
+    
+    # Buscamos en el texto Markdown
+    for code in MAPEO_CASILLAS.keys():
+        # Buscamos patrones típicos de tablas Markdown: | 359 | 214006 |
+        # \|\s*{code}\s*\| captura el código entre tuberías
+        # \s*([\d\.\,\(\)\-\s]+) captura el número que sigue
+        patron = rf"\|\s*{code}\s*\|\s*([\d\.\,\(\)\-\s]+)\s*\|"
+        match = re.search(patron, md_text)
+        
+        if match:
+            datos_extraidos[code] = limpiar_valor(match.group(1))
+        else:
+            # Fallback: si no está en formato tabla, buscamos el código como texto plano
+            # Busca: 359 (espacios) número
+            patron_plano = rf"\b{code}\b\s+([\d\.\,\(\)\-\s]+)"
+            match_plano = re.search(patron_plano, md_text)
+            if match_plano:
+                datos_extraidos[code] = limpiar_valor(match_plano.group(1))
+                
     return datos_extraidos
