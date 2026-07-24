@@ -1,36 +1,32 @@
 import pdfplumber
-import re
 from mapping import MAPEO_CASILLAS
 
 def limpiar_valor(valor):
-    # Esto elimina puntos de miles, comas, y convierte paréntesis a negativo
-    # También limpia espacios extraños
     if valor is None: return 0
-    clean = valor.replace(' ', '').replace(',', '').replace('(', '-').replace(')', '')
+    # Limpiamos caracteres extraños y paréntesis para negativos
+    val_str = str(valor).strip().replace('(', '-').replace(')', '').replace(',', '')
     try:
-        return float(clean)
+        return float(val_str)
     except:
         return 0
 
 def extraer_datos_de_pdf(archivo_pdf):
     datos_extraidos = {}
     with pdfplumber.open(archivo_pdf) as pdf:
-        # Unimos todo el texto de todas las páginas
-        full_text = ""
         for page in pdf.pages:
-            full_text += page.extract_text() + "\n"
-        
-        # Regex: busca código de 3 dígitos, luego busca el número a la derecha
-        # Busca códigos como 359, 409, 490... y captura el valor numérico (incluyendo negativos)
-        # Esto es muy flexible: encuentra el código y el primer número después de él.
-        for code in MAPEO_CASILLAS.keys():
-            # Patrón: el código, espacios, y un valor (posiblemente con paréntesis o guiones)
-            # Ejemplo: "409 (espacios) 1951909"
-            regex_pat = rf"{code}\s+([\d\.\,\(\)\-\s]+)"
-            match = re.search(regex_pat, full_text)
-            
-            if match:
-                valor_crudo = match.group(1)
-                datos_extraidos[code] = limpiar_valor(valor_crudo)
-                
+            table = page.extract_table()
+            if table:
+                for row in table:
+                    # Limpiamos la fila de Nones para poder iterar bien
+                    row_limpia = [str(cell).strip() if cell is not None else "" for cell in row]
+                    
+                    # Buscamos la casilla en la fila
+                    for i, cell in enumerate(row_limpia):
+                        if cell in MAPEO_CASILLAS:
+                            # SEGURIDAD: Solo intentamos leer el valor si existe una columna a la derecha
+                            if i + 1 < len(row_limpia):
+                                valor = row_limpia[i+1]
+                                # Solo procesamos si el valor no está vacío
+                                if valor:
+                                    datos_extraidos[cell] = limpiar_valor(valor)
     return datos_extraidos
