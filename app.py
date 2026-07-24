@@ -1,50 +1,31 @@
 import streamlit as st
-import openpyxl
+import pandas as pd
 from utils import extraer_datos_de_pdf
-from mapping import MAPEO_CASILLAS
+from labels import ETIQUETAS
 
-st.set_page_config(page_title="Scoring Final")
-st.title("SACA TUS RATIOS RAPIDISIMOOOO")
+st.set_page_config(page_title="Extractor Financiero", layout="wide")
+st.title("📊 Extractor de Datos Financieros SUNAT")
 
-cliente = st.text_input("Nombre del Cliente")
-pdf_2023 = st.file_uploader("Subir PDF 2023 (Opcional)")
-pdf_2024 = st.file_uploader("Subir PDF 2024 (Opcional)")
-pdf_2025 = st.file_uploader("Subir PDF 2025 (Opcional)")
+# Pestañas
+tab1, tab2, tab3 = st.tabs(["2023", "2024", "2025"])
+archivos = {"2023": tab1, "2024": tab2, "2025": tab3}
 
-archivos = {"2023": pdf_2023, "2024": pdf_2024, "2025": pdf_2025}
-
-def limpiar_nombre(nombre):
-    return nombre.replace(".", "")
-
-if st.button("Generar Excel"):
-    if not cliente:
-        st.error("Ingresa el nombre del cliente")
-    else:
-        wb = openpyxl.load_workbook("Scoring Final.xlsx")
-        ws_final = wb["SCORING_FINAL"]
-        ws_final["C2"] = limpiar_nombre(cliente)
+def procesar_y_mostrar(anio, tab_container):
+    archivo = tab_container.file_uploader(f"Subir PDF {anio}", type=["pdf"], key=f"file_{anio}")
+    if archivo:
+        datos = extraer_datos_de_pdf(archivo)
+        # Convertir a DataFrame legible
+        data = [{"Casilla": k, "Cuenta": ETIQUETAS.get(k, "Otros"), "Valor": v} for k, v in datos.items()]
+        df = pd.DataFrame(data)
         
-        for anio, archivo in archivos.items():
-            if archivo and anio in wb.sheetnames:
-                ws = wb[anio]
-                datos = extraer_datos_de_pdf(archivo)
-                for casilla, valor in datos.items():
-                    celda = MAPEO_CASILLAS.get(casilla)
-                    if celda and not str(ws[celda].value).startswith("="):
-                        if valor != 0:
-                            ws[celda] = valor
-                            # Este es el formato contable que da ese estilo:
-                            ws[celda].number_format = '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)'
-                        else:
-                            # Para que el cero también se vea como "-"
-                            ws[celda] = 0
-                            ws[celda].number_format = '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)'
-        
-        nombre_final = f"Scoring Final - {limpiar_nombre(cliente)}.xlsx"
-        wb.save(nombre_final)
-        with open(nombre_final, "rb") as f:
-            st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
+        tab_container.dataframe(df, use_container_width=True)
+        tab_container.success(f"Datos del {anio} cargados con éxito. Puedes copiar la tabla.")
 
-if st.button("Limpiar / Nuevo Cliente"):
+# Procesar cada año
+with tab1: procesar_y_mostrar("2023", tab1)
+with tab2: procesar_y_mostrar("2024", tab2)
+with tab3: procesar_y_mostrar("2025", tab3)
+
+if st.button("Limpiar todo"):
     st.session_state.clear()
     st.rerun()
