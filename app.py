@@ -33,9 +33,12 @@ if st.button("Generar Excel"):
                     if celda and not str(ws[celda].value).startswith("="):
                         if valor != 0:
                             ws[celda] = valor
-                            ws[celda].number_format = '_("S/"* #,##0.00_);_("S/"* (#,##0.00);_("S/"* "-"??_);_(@_)'
+                            # Este es el formato contable que da ese estilo:
+                            ws[celda].number_format = '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)'
                         else:
-                            ws[celda] = ""
+                            # Para que el cero también se vea como "-"
+                            ws[celda] = 0
+                            ws[celda].number_format = '_(* #,##0.00_);_(* (#,##0.00);_(* "-"??_);_(@_)'
         
         nombre_final = f"Scoring Final - {limpiar_nombre(cliente)}.xlsx"
         wb.save(nombre_final)
