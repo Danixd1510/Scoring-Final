@@ -51,7 +51,3 @@ if st.button("Generar Excel"):
         
         with open(nombre_final, "rb") as f:
             st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
-
-if st.button("Limpiar / Nuevo Cliente"):
-    st.session_state.clear()
-    st.rerun()
