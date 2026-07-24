@@ -1,41 +1,36 @@
 import streamlit as st
+import pandas as pd
 from utils import extraer_datos_de_pdf
-from structure import CUENTAS
+from structure import BALANCE_DATA, RESULTADOS_DATA
 
 st.set_page_config(page_title="Scoring Financiero", layout="wide")
-st.title("📊 Vista de Datos Financieros")
+st.title("SACA TUS RATIOS RAPIDISIMOOOO")
 
-# Subida de archivos
-col_up1, col_up2, col_up3 = st.columns(3)
-pdf_2023 = col_up1.file_uploader("PDF 2023")
-pdf_2024 = col_up2.file_uploader("PDF 2024")
-pdf_2025 = col_up3.file_uploader("PDF 2025")
+def formato_excel(valor):
+    if valor == 0: return "S/ -"
+    return f"S/ {valor:,.2f}"
 
-archivos = {"2023": pdf_2023, "2024": pdf_2024, "2025": pdf_2025}
+def generar_tabla(datos, estructura):
+    tabla_data = []
+    for cod, nombre in estructura.items():
+        val = datos.get(cod, 0)
+        tabla_data.append({"Cuenta": nombre, "Valor": formato_excel(val)})
+    return pd.DataFrame(tabla_data)
 
-def formato_contable(valor):
-    if valor == 0: return "-"
-    return f"{valor:,.2f}"
+# Pestañas
+tab_2023, tab_2024, tab_2025 = st.tabs(["2023", "2024", "2025"])
+pestanas = {"2023": tab_2023, "2024": tab_2024, "2025": tab_2025}
 
-for anio, archivo in archivos.items():
-    if archivo:
-        st.subheader(f"Datos: {anio}")
-        datos = extraer_datos_de_pdf(archivo)
-        
-        # Dividimos en dos columnas para el Activo y Pasivo/Patrimonio
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### Activo")
-            for cod, label, sec in CUENTAS:
-                if sec == "Activo":
-                    val = datos.get(cod, 0)
-                    st.text(f"{label:<45} {formato_contable(val):>20}")
-        
-        with col2:
-            st.markdown("### Pasivo y Patrimonio")
-            for cod, label, sec in CUENTAS:
-                if sec in ["Pasivo", "Patrimonio"]:
-                    val = datos.get(cod, 0)
-                    st.text(f"{label:<45} {formato_contable(val):>20}")
-        st.divider()
+for anio, tab in pestanas.items():
+    with tab:
+        archivo = st.file_uploader(f"Subir PDF {anio}", type=["pdf"], key=f"up_{anio}")
+        if archivo:
+            datos = extraer_datos_de_pdf(archivo)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader("Balance General")
+                st.table(generar_tabla(datos, BALANCE_DATA))
+            with c2:
+                st.subheader("Estado de Resultados")
+                st.table(generar_tabla(datos, RESULTADOS_DATA))
