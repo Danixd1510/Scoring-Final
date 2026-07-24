@@ -1,28 +1,32 @@
 import pdfplumber
-import re
 from mapping import MAPEO_CASILLAS
 
 def limpiar_valor(valor):
     if valor is None: return 0
-    # Limpieza: quitamos espacios, comas, y paréntesis para negativos
-    clean = str(valor).strip().replace(' ', '').replace(',', '').replace('(', '-').replace(')', '')
+    # Limpiamos caracteres extraños y paréntesis para negativos
+    val_str = str(valor).strip().replace('(', '-').replace(')', '').replace(',', '')
     try:
-        return float(clean)
+        return float(val_str)
     except:
         return 0
 
 def extraer_datos_de_pdf(archivo_pdf):
     datos_extraidos = {}
     with pdfplumber.open(archivo_pdf) as pdf:
-        full_text = ""
         for page in pdf.pages:
-            full_text += page.extract_text() + "\n"
-        
-        # Regex: Busca el código de 3 dígitos, espacios, y captura el número
-        for code in MAPEO_CASILLAS.keys():
-            # Busca el código, espacios, y captura caracteres numéricos/símbolos
-            pattern = rf"{code}\s+([\d\.\,\(\)\-\s]+)"
-            match = re.search(pattern, full_text)
-            if match:
-                datos_extraidos[code] = limpiar_valor(match.group(1))
+            table = page.extract_table()
+            if table:
+                for row in table:
+                    # Limpiamos la fila de Nones para poder iterar bien
+                    row_limpia = [str(cell).strip() if cell is not None else "" for cell in row]
+                    
+                    # Buscamos la casilla en la fila
+                    for i, cell in enumerate(row_limpia):
+                        if cell in MAPEO_CASILLAS:
+                            # SEGURIDAD: Solo intentamos leer el valor si existe una columna a la derecha
+                            if i + 1 < len(row_limpia):
+                                valor = row_limpia[i+1]
+                                # Solo procesamos si el valor no está vacío
+                                if valor:
+                                    datos_extraidos[cell] = limpiar_valor(valor)
     return datos_extraidos
