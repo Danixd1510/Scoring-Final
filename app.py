@@ -32,9 +32,16 @@ if st.button("Generar Excel"):
             if archivo and anio in wb.sheetnames:
                 al_menos_uno = True
                 ws = wb[anio]
+                st.write(f"Datos extraídos del año {anio}:")
+                st.write(datos)
                 datos = extraer_datos_de_pdf(archivo)
                 for casilla, valor in datos.items():
                     celda = MAPEO_CASILLAS.get(casilla)
+                        st.write(
+                            f"Año: {anio} | "
+                            f"Código: {casilla} | "
+                            f"Valor: {valor} | "
+                            f"Celda destino: {celda}")
                     if celda and not str(ws[celda].value).startswith("="):
                         if valor != 0:
                             ws[celda] = valor
