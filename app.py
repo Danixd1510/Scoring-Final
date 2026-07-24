@@ -6,7 +6,6 @@ from mapping import MAPEO_CASILLAS
 st.set_page_config(page_title="Scoring Financiero")
 st.title("SACA TUS RATIOS RAPIDISIMOOOO")
 
-# Campos de entrada
 cliente = st.text_input("Nombre del Cliente")
 
 pdf_2023 = st.file_uploader("Subir PDF 2023 (Opcional)")
@@ -22,15 +21,10 @@ if st.button("Generar Excel"):
     if not cliente:
         st.error("Por favor ingresa el nombre del cliente")
     else:
-        # Cargamos el archivo template
+        # Cargamos el template
         wb = openpyxl.load_workbook("Scoring Final.xlsx")
         
-        # 1. Escribir nombre en SCORING_FINAL (Solo tocamos C2)
-        if "SCORING_FINAL" in wb.sheetnames:
-            ws_final = wb["SCORING_FINAL"]
-            ws_final["C2"] = limpiar_nombre(cliente)
-        
-        # 2. Procesar años (2023, 2024, 2025)
+        # PROCESAMOS SOLO LAS PESTAÑAS DE AÑOS
         for anio, archivo in archivos.items():
             if archivo and anio in wb.sheetnames:
                 ws = wb[anio]
@@ -38,19 +32,22 @@ if st.button("Generar Excel"):
                 
                 for casilla, valor in datos.items():
                     celda = MAPEO_CASILLAS.get(casilla)
-                    
                     if celda:
-                        # PROTECCIÓN: Si la celda es fórmula, saltar
-                        if ws[celda].data_type == 'f' or str(ws[celda].value).startswith("="):
+                        # Protección: No tocar celdas con fórmulas
+                        if str(ws[celda].value).startswith("="):
                             continue
                             
-                        # Escribir valor con formato contable (sin paréntesis)
+                        # Aplicar valor y formato contable (sin paréntesis)
                         ws[celda] = valor
                         ws[celda].number_format = '_(* #,##0.00_);_(* -#,##0.00_);_(* "-"??_);_(@_)'
         
-        # Guardar
+        # Guardar archivo con nombre limpio
         nombre_final = f"Scoring Final - {limpiar_nombre(cliente)}.xlsx"
         wb.save(nombre_final)
         
         with open(nombre_final, "rb") as f:
             st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
+
+if st.button("Limpiar / Nuevo Cliente"):
+    st.session_state.clear()
+    st.rerun()
