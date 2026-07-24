@@ -14,19 +14,13 @@ st.title(
 )
 
 
-# -------------------------
-# NOMBRE DEL CLIENTE
-# -------------------------
-
+# Nombre del cliente
 cliente = st.text_input(
     "Nombre del Cliente"
 )
 
 
-# -------------------------
-# ARCHIVOS PDF
-# -------------------------
-
+# Archivos PDF
 pdf_2023 = st.file_uploader(
     "Subir DDJJ 2023",
     type=["pdf"]
@@ -50,10 +44,6 @@ archivos = {
 }
 
 
-# -------------------------
-# LIMPIAR NOMBRE
-# -------------------------
-
 def limpiar_nombre(nombre):
 
     return nombre.replace(
@@ -62,10 +52,7 @@ def limpiar_nombre(nombre):
     )
 
 
-# -------------------------
-# GENERAR EXCEL
-# -------------------------
-
+# Botón Generar Excel
 if st.button("Generar Excel"):
 
     if not cliente:
@@ -83,10 +70,7 @@ if st.button("Generar Excel"):
         al_menos_uno = False
 
 
-        # -------------------------
-        # PROCESAR ARCHIVOS
-        # -------------------------
-
+        # Procesar archivos
         for anio, archivo in archivos.items():
 
             if archivo and anio in wb.sheetnames:
@@ -95,37 +79,17 @@ if st.button("Generar Excel"):
 
                 ws = wb[anio]
 
-
-                # Extraer primero los datos
+                # Extraer datos del PDF
                 datos = extraer_datos_de_pdf(
                     archivo
                 )
 
 
-                # Mostrar los datos extraídos
-                st.write(
-                    f"Datos extraídos del año {anio}:"
-                )
-
-                st.write(
-                    datos
-                )
-
-
-                # Procesar cada código
+                # Escribir datos en Excel
                 for casilla, valor in datos.items():
 
                     celda = MAPEO_CASILLAS.get(
                         casilla
-                    )
-
-
-                    # Mostrar el mapeo
-                    st.write(
-                        f"Año: {anio} | "
-                        f"Código: {casilla} | "
-                        f"Valor: {valor} | "
-                        f"Celda destino: {celda}"
                     )
 
 
@@ -138,8 +102,6 @@ if st.button("Generar Excel"):
 
                         ws[celda] = valor
 
-
-                        # Formato contable
                         ws[celda].number_format = (
                             '_(* #,##0.00_);'
                             '_(* (#,##0.00);'
@@ -147,10 +109,6 @@ if st.button("Generar Excel"):
                             '_(@_)'
                         )
 
-
-        # -------------------------
-        # AVISO
-        # -------------------------
 
         if not al_menos_uno:
 
@@ -160,41 +118,38 @@ if st.button("Generar Excel"):
             )
 
 
-        # -------------------------
-        # GUARDAR
-        # -------------------------
-
+        # Nombre final
         nombre_final = (
             f"Scoring Final - "
             f"{limpiar_nombre(cliente)}.xlsx"
         )
 
 
+        # Guardar Excel
         wb.save(
             nombre_final
         )
 
 
-        # -------------------------
-        # DESCARGAR
-        # -------------------------
-
+        # Botón de descarga
         with open(
             nombre_final,
             "rb"
         ) as f:
 
             st.download_button(
-                "📥 Descargar Excel",
-                f,
-                file_name=nombre_final
+                label="📥 Descargar Excel",
+                data=f,
+                file_name=nombre_final,
+                mime=(
+                    "application/"
+                    "vnd.openxmlformats-officedocument"
+                    ".spreadsheetml.sheet"
+                )
             )
 
 
-# -------------------------
-# LIMPIAR
-# -------------------------
-
+# Botón Limpiar
 if st.button("Limpiar"):
 
     st.session_state.clear()
