@@ -3,9 +3,12 @@ from mapping import MAPEO_CASILLAS
 
 def limpiar_valor(valor):
     if valor is None: return 0
+    # Limpiamos caracteres extraños y paréntesis para negativos
     val_str = str(valor).strip().replace('(', '-').replace(')', '').replace(',', '')
-    try: return float(val_str)
-    except: return 0
+    try:
+        return float(val_str)
+    except:
+        return 0
 
 def extraer_datos_de_pdf(archivo_pdf):
     datos_extraidos = {}
@@ -14,9 +17,16 @@ def extraer_datos_de_pdf(archivo_pdf):
             table = page.extract_table()
             if table:
                 for row in table:
-                    for i in range(len(row)):
-                        if str(row[i]) in MAPEO_CASILLAS:
-                            casilla = str(row[i])
-                            valor = row[i+1]
-                            datos_extraidos[casilla] = limpiar_valor(valor)
+                    # Limpiamos la fila de Nones para poder iterar bien
+                    row_limpia = [str(cell).strip() if cell is not None else "" for cell in row]
+                    
+                    # Buscamos la casilla en la fila
+                    for i, cell in enumerate(row_limpia):
+                        if cell in MAPEO_CASILLAS:
+                            # SEGURIDAD: Solo intentamos leer el valor si existe una columna a la derecha
+                            if i + 1 < len(row_limpia):
+                                valor = row_limpia[i+1]
+                                # Solo procesamos si el valor no está vacío
+                                if valor:
+                                    datos_extraidos[cell] = limpiar_valor(valor)
     return datos_extraidos
