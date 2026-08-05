@@ -80,4 +80,8 @@ def extraer_reporte_tributario(pdf_path):
                         
                         # Verificamos que sea un número real (que no sea texto como 'VENTAS')
                         if val_str.replace('.', '').isdigit():
-                            venta
+                            venta = float(val_str)
+                            total_ventas += venta
+                            mes_detectado = meses_map[mes_raw] # Se actualiza al mes actual
+                            
+    return total_ventas, mes_detectado
