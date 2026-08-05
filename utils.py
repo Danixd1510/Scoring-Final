@@ -40,21 +40,38 @@ def extraer_datos_de_pdf(archivo_pdf):
                             
     return datos_extraidos
 
-import pdfplumber
-import re
+import streamlit as st
+import openpyxl
+from utils import extraer_ficha_ruc
 
-def extraer_ficha_ruc(pdf_path):
-    info = {"RUC": "-", "Nombre": "-", "Inicio": "-"}
-    with pdfplumber.open(pdf_path) as pdf:
-        # Extraemos texto de todas las páginas
-        text = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
+st.set_page_config(page_title="Extractor RUC", layout="centered")
+st.title("Extractor de Ficha RUC")
+
+ficha_file = st.file_uploader("Subir Ficha RUC (PDF)", type=["pdf"])
+
+if ficha_file:
+    # Extraer info
+    info = extraer_ficha_ruc(ficha_file)
+    
+    # Mostrar en pantalla
+    st.success("Información extraída correctamente:")
+    st.write(f"**Empresa:** {info['Nombre']}")
+    st.write(f"**RUC:** {info['RUC']}")
+    st.write(f"**Inicio de Actividades:** {info['Inicio']}")
+    
+    # Botón para actualizar el Excel
+    if st.button("Actualizar Scoring Final.xlsx"):
+        wb = openpyxl.load_workbook("Scoring Final.xlsx")
         
-        # Regex para buscar datos en la Ficha RUC de SUNAT
-        ruc_match = re.search(r'FICHA RUC\s*:\s*(\d{11})', text)
-        nombre_match = re.search(r'Apellidos y Nombres ó Razón Social\s*:\s*(.*)', text)
-        fecha_match = re.search(r'Fecha de Inicio de Actividades\s*:\s*(\d{2}/\d{2}/\d{4})', text)
-        
-        if ruc_match: info["RUC"] = ruc_match.group(1)
-        if nombre_match: info["Nombre"] = nombre_match.group(1).strip()
-        if fecha_match: info["Inicio"] = fecha_match.group(1)
-    return info
+        # Escribir en la pestaña SCORING_FINAL
+        if "SCORING_FINAL" in wb.sheetnames:
+            ws = wb["SCORING_FINAL"]
+            ws["C2"] = info['Nombre'].replace(".", "") # Cliente
+            ws["C3"] = info['RUC']                    # RUC
+            ws["C4"] = info['Inicio']                 # Fecha inicio
+            
+            nombre_final = f"Scoring Final - {info['Nombre'].replace('.', '')}.xlsx"
+            wb.save(nombre_final)
+            
+            with open(nombre_final, "rb") as f:
+                st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
