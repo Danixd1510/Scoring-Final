@@ -40,11 +40,16 @@ def extraer_datos_de_pdf(archivo_pdf):
                             
     return datos_extraidos
 
+import pdfplumber
+import re
+
 def extraer_ficha_ruc(pdf_path):
     info = {"RUC": "-", "Nombre": "-", "Inicio": "-"}
     with pdfplumber.open(pdf_path) as pdf:
+        # Extraemos texto de todas las páginas
         text = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
-        # Regex para buscar datos
+        
+        # Regex para buscar datos en la Ficha RUC de SUNAT
         ruc_match = re.search(r'FICHA RUC\s*:\s*(\d{11})', text)
         nombre_match = re.search(r'Apellidos y Nombres ó Razón Social\s*:\s*(.*)', text)
         fecha_match = re.search(r'Fecha de Inicio de Actividades\s*:\s*(\d{2}/\d{2}/\d{4})', text)
@@ -53,41 +58,3 @@ def extraer_ficha_ruc(pdf_path):
         if nombre_match: info["Nombre"] = nombre_match.group(1).strip()
         if fecha_match: info["Inicio"] = fecha_match.group(1)
     return info
-
-def extraer_reporte_tributario(pdf_path):
-    meses_map = {
-        "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5,
-        "JUNIO": 6, "JULIO": 7, "AGOSTO": 8, "SETIEMBRE": 9, 
-        "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
-    }
-    
-    total_ventas = 0
-    mes_detectado = 0
-    
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            tables = page.extract_tables()
-            for table in tables:
-                # Convertimos toda la tabla a texto para verificar que es la de 2026
-                tabla_texto = " ".join([str(cell) for row in table for cell in row if cell])
-                
-                if "2026" in tabla_texto and "VENTAS" in tabla_texto:
-                    for row in table:
-                        if not row or row[0] is None: continue
-                        
-                        mes_raw = str(row[0]).strip().upper()
-                        
-                        # 1. Detectar el último mes con ventas en columna 1 (VENTAS)
-                        if mes_raw in meses_map:
-                            if row[1] and str(row[1]).strip() not in ["", "-"]:
-                                mes_detectado = meses_map[mes_raw]
-                        
-                        # 2. Detectar TOTAL en la fila que contiene TOTAL EJERCICIO
-                        if "TOTAL" in mes_raw:
-                            try:
-                                # row[1] es la columna VENTAS
-                                total_ventas = float(str(row[1]).replace(',', '').replace(' ', '').strip())
-                            except:
-                                pass
-                                
-    return total_ventas, mes_detectado
