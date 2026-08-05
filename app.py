@@ -1,5 +1,6 @@
 import streamlit as st
 import openpyxl
+import os # Importante para verificar si el archivo existe
 from utils import extraer_datos_de_pdf, extraer_ficha_ruc, extraer_reporte_tributario
 from mapping import MAPEO_CASILLAS
 
@@ -17,7 +18,7 @@ if ficha_file:
 
 if reporte_file:
     ventas, mes = extraer_reporte_tributario(reporte_file)
-    st.info(f"**Ventas Totales (Total Ejercicio):** S/ {ventas:,.2f} | **Último mes declarado:** {mes}")
+    st.info(f"**Ventas Totales:** S/ {ventas:,.2f} | **Mes detectado:** {mes}")
 
 st.divider()
 
@@ -34,30 +35,33 @@ if st.button("Generar Excel"):
     if not cliente:
         st.error("Por favor ingresa el nombre del cliente")
     else:
-        # Cargamos el archivo original
-        wb = openpyxl.load_workbook("Scoring Final.xlsx")
-        
-        # Procesar solo las pestañas de años (2023, 2024, 2025)
-        # NUNCA tocamos la pestaña SCORING_FINAL
-        for anio, archivo in archivos.items():
-            if archivo and anio in wb.sheetnames:
-                ws = wb[anio]
-                datos = extraer_datos_de_pdf(archivo)
+        # VERIFICACIÓN DE SEGURIDAD: Comprobar si el archivo existe en el servidor
+        if not os.path.exists("Scoring Final.xlsx"):
+            st.error("Error crítico: No se encuentra 'Scoring Final.xlsx' en el servidor. Asegúrate de que el archivo esté en la raíz de tu repositorio de GitHub.")
+        else:
+            try:
+                wb = openpyxl.load_workbook("Scoring Final.xlsx")
                 
-                for casilla, valor in datos.items():
-                    celda = MAPEO_CASILLAS.get(casilla)
-                    if celda:
-                        # Protección: Si la celda tiene una fórmula, no la tocamos
-                        celda_val = ws[celda].value
-                        if celda_val is not None and str(celda_val).startswith("="):
-                            continue
-                            
-                        # Escribir valor con formato contable (con guion y sin paréntesis)
-                        ws[celda] = valor
-                        ws[celda].number_format = '_(* #,##0.00_);_(* -#,##0.00_);_(* "-"??_);_(@_)'
-        
-        nombre_final = f"Scoring Final - {cliente.replace('.', '')}.xlsx"
-        wb.save(nombre_final)
-        
-        with open(nombre_final, "rb") as f:
-            st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
+                for anio, archivo in archivos.items():
+                    if archivo and anio in wb.sheetnames:
+                        ws = wb[anio]
+                        datos = extraer_datos_de_pdf(archivo)
+                        
+                        for casilla, valor in datos.items():
+                            celda = MAPEO_CASILLAS.get(casilla)
+                            if celda:
+                                if str(ws[celda].value).startswith("="):
+                                    continue
+                                ws[celda] = valor
+                                ws[celda].number_format = '_(* #,##0.00_);_(* -#,##0.00_);_(* "-"??_);_(@_)'
+                
+                nombre_final = f"Scoring Final - {cliente.replace('.', '')}.xlsx"
+                wb.save(nombre_final)
+                with open(nombre_final, "rb") as f:
+                    st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
+            except Exception as e:
+                st.error(f"Error al procesar el archivo: {e}")
+
+if st.button("Limpiar / Nuevo Cliente"):
+    st.session_state.clear()
+    st.rerun()
