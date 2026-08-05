@@ -17,7 +17,7 @@ if ficha_file:
 
 if reporte_file:
     ventas, mes = extraer_reporte_tributario(reporte_file)
-    st.info(f"**Ventas Totales:** S/ {ventas:,.2f} | **Mes detectado:** {mes}")
+    st.info(f"**Ventas Totales (Total Ejercicio):** S/ {ventas:,.2f} | **Último mes declarado:** {mes}")
 
 st.divider()
 
