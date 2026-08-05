@@ -27,7 +27,7 @@ if st.button("Generar Excel"):
         st.error(f"Error: El archivo '{ARCHIVO_TEMPLATE}' no se encuentra en la raíz.")
     else:
         # Cargamos manteniendo macros y estructuras (keep_vba=True)
-        wb = openpyxl.load_workbook(ARCHIVO_TEMPLATE, keep_vba=True)
+        wb = openpyxl.load_workbook("Scoring Final.xlsm", keep_vba=True, keep_links=True, data_only=False)
         
         # Procesar archivos
         for anio, archivo in archivos.items():
