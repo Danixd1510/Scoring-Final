@@ -61,36 +61,40 @@ def extraer_reporte_tributario(pdf_path):
         "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
     }
     
+    total_ventas = 0
+    mes_detectado = 0
+    
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             tables = page.extract_tables()
             for table in tables:
-                # Convertimos toda la tabla a texto para buscar el encabezado
-                tabla_texto = " ".join([str(cell) for row in table for cell in row if cell])
+                # Vamos a recorrer la tabla buscando datos
+                tiene_meses = False
+                temp_total = 0
+                temp_mes = 0
                 
-                # FILTRO MÁGICO: Solo procesamos si la tabla menciona 2026
-                if "2026" in tabla_texto:
-                    total_ventas = 0
-                    mes_detectado = 0
+                for row in table:
+                    if not row or row[0] is None: continue
                     
-                    for row in table:
-                        # Saltar filas vacías
-                        if not row or not row[0]: continue
-                        
-                        mes_raw = str(row[0]).strip().upper()
-                        
-                        # Si es un mes y tiene ventas, actualizamos el último mes detectado
-                        if mes_raw in meses_map:
-                            if row[1] and row[1].strip() != "":
-                                mes_detectado = meses_map[mes_raw]
-                        
-                        # Si encontramos la fila de TOTAL, esa es la que queremos
-                        if "TOTAL EJERCICIO" in mes_raw:
-                            try:
-                                total_ventas = float(str(row[1]).replace(',', '').strip())
-                            except:
-                                pass
+                    mes_raw = str(row[0]).strip().upper()
                     
-                    # Retornamos solo si encontramos datos en la tabla del 2026
-                    return total_ventas, mes_detectado
-    return 0, 0
+                    # Detectar Mes
+                    if mes_raw in meses_map:
+                        if row[1] and str(row[1]).strip() not in ["", "-"]:
+                            temp_mes = meses_map[mes_raw]
+                            tiene_meses = True
+                            
+                    # Detectar TOTAL
+                    if "TOTAL" in mes_raw:
+                        val_str = str(row[1]).replace(',', '').strip()
+                        try:
+                            temp_total = float(val_str)
+                        except:
+                            pass
+                
+                # Si esta tabla tenía meses, es la que queremos
+                if tiene_meses:
+                    total_ventas = temp_total
+                    mes_detectado = temp_mes
+                    
+    return total_ventas, mes_detectado
