@@ -65,23 +65,29 @@ def extraer_reporte_tributario(pdf_path):
     
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
+            # Obtenemos todas las tablas de la página
             tables = page.extract_tables()
             for table in tables:
-                # Verificamos si esta tabla es la del EJERCICIO CORRIENTE
-                tabla_str = str(table)
-                if "EJERCICIO CORRIENTE" in tabla_str:
+                # Convertimos la tabla a string para verificar si es la del 2026
+                tabla_texto = " ".join([str(cell) for row in table for cell in row if cell])
+                
+                # BUSCAMOS ESPECÍFICAMENTE LA TABLA DE 2026
+                if "EJERCICIO CORRIENTE" in tabla_texto or "2026" in tabla_texto:
                     for row in table:
-                        # row[0] es MES, row[1] es VENTAS
+                        # Limpiamos el texto de la primera columna (columna MES)
                         mes_raw = str(row[0]).strip().upper() if row[0] else ""
                         
-                        # Si es una fila de mes, actualizamos el mes detectado
+                        # Si es un mes y tiene valor de ventas (en la columna 1)
                         if mes_raw in meses_map and row[1]:
-                            mes_detectado = meses_map[mes_raw]
+                            # Convertimos a string y quitamos comas
+                            val_str = str(row[1]).replace(',', '').strip()
+                            if val_str.replace('.','').isdigit(): # Verificamos que sea número
+                                mes_detectado = meses_map[mes_raw]
                         
-                        # Si es la fila de TOTAL, extraemos el valor
-                        if "TOTAL" in mes_raw:
+                        # Si encontramos la fila de TOTAL, esa es la que queremos
+                        elif "TOTAL" in mes_raw:
                             try:
-                                total_ventas = float(str(row[1]).replace(',', '').replace(' ', ''))
+                                total_ventas = float(str(row[1]).replace(',', '').strip())
                             except:
                                 pass
     return total_ventas, mes_detectado
