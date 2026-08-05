@@ -68,20 +68,29 @@ def extraer_reporte_tributario(pdf_path):
         for page in pdf.pages:
             tables = page.extract_tables()
             for table in tables:
-                for row in table:
-                    # Saltamos si la fila es nula o no tiene nada en la primera columna
-                    if not row or row[0] is None: continue
-                    
-                    mes_raw = str(row[0]).strip().upper()
-                    
-                    # Verificamos si es una fila de mes válida y si tiene ventas
-                    if mes_raw in meses_map and row[1]:
-                        val_str = str(row[1]).replace(',', '').strip()
+                # Convertimos la tabla a texto para verificar si es la del 2026
+                tabla_texto = " ".join([str(cell) for row in table for cell in row if cell])
+                
+                # SOLO ENTRA AQUÍ SI DETECTA QUE ES LA TABLA DE 2026
+                if "2026" in tabla_texto:
+                    for row in table:
+                        if not row or row[0] is None: continue
                         
-                        # Verificamos que sea un número real (que no sea texto como 'VENTAS')
-                        if val_str.replace('.', '').isdigit():
-                            venta = float(val_str)
-                            total_ventas += venta
-                            mes_detectado = meses_map[mes_raw] # Se actualiza al mes actual
-                            
-    return total_ventas, mes_detectado
+                        mes_raw = str(row[0]).strip().upper()
+                        
+                        # Si es un mes válido, guardamos el número del mes
+                        if mes_raw in meses_map:
+                            if row[1] and str(row[1]).replace(',', '').strip().replace('.', '').isdigit():
+                                mes_detectado = meses_map[mes_raw]
+                        
+                        # Si es la fila de TOTAL, extraemos el valor
+                        elif "TOTAL" in mes_raw:
+                            try:
+                                total_ventas = float(str(row[1]).replace(',', '').strip())
+                            except:
+                                pass
+                    
+                    # Una vez que procesamos la tabla 2026, salimos de todo
+                    return total_ventas, mes_detectado
+                    
+    return 0, 0
