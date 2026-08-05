@@ -8,8 +8,8 @@ st.title("SACA TUS RATIOS RAPIDISIMOOOO")
 
 # --- SECCIÓN 1: VISTA EN PANTALLA ---
 col1, col2 = st.columns(2)
-ficha_file = col1.file_uploader("Subir Ficha RUC (PDF)", type=["pdf"])
-reporte_file = col2.file_uploader("Subir Reporte Tributario (PDF)", type=["pdf"])
+ficha_file = col1.file_uploader("Subir Ficha RUC", type=["pdf"])
+reporte_file = col2.file_uploader("Subir Reporte Tributario", type=["pdf"])
 
 if ficha_file:
     info = extraer_ficha_ruc(ficha_file)
@@ -24,9 +24,9 @@ st.divider()
 # --- SECCIÓN 2: GENERACIÓN EXCEL ---
 st.header("Generar Reporte de Ratios")
 cliente = st.text_input("Nombre del Cliente")
-pdf_2023 = st.file_uploader("Subir PDF 2023 (Opcional)")
-pdf_2024 = st.file_uploader("Subir PDF 2024 (Opcional)")
-pdf_2025 = st.file_uploader("Subir PDF 2025 (Opcional)")
+pdf_2023 = st.file_uploader("Subir PDF 2023")
+pdf_2024 = st.file_uploader("Subir PDF 2024")
+pdf_2025 = st.file_uploader("Subir PDF 2025")
 
 archivos = {"2023": pdf_2023, "2024": pdf_2024, "2025": pdf_2025}
 
@@ -61,7 +61,3 @@ if st.button("Generar Excel"):
         
         with open(nombre_final, "rb") as f:
             st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
-
-if st.button("Limpiar / Nuevo Cliente"):
-    st.session_state.clear()
-    st.rerun()
