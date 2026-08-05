@@ -55,6 +55,11 @@ def extraer_ficha_ruc(pdf_path):
     return info
 
 def extraer_reporte_tributario(pdf_path):
+    meses_map = {
+        "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5,
+        "JUNIO": 6, "JULIO": 7, "AGOSTO": 8, "SETIEMBRE": 9, 
+        "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
+    }
     total_ventas = 0
     mes_detectado = 0
     
@@ -62,23 +67,21 @@ def extraer_reporte_tributario(pdf_path):
         for page in pdf.pages:
             tables = page.extract_tables()
             for table in tables:
-                # Buscamos la tabla que contiene el "EJERCICIO CORRIENTE"
-                # Convertimos la tabla a texto para verificar si es la correcta
-                tabla_texto = " ".join([str(cell) for row in table for cell in row if cell])
-                
-                if "EJERCICIO CORRIENTE" in tabla_texto:
-                    # Iteramos sobre las filas de la tabla
+                # Verificamos si esta tabla es la del EJERCICIO CORRIENTE
+                tabla_str = str(table)
+                if "EJERCICIO CORRIENTE" in tabla_str:
                     for row in table:
-                        # Buscamos filas que tengan un mes y un valor de ventas
-                        # Asumiendo estructura: [MES, VENTAS, INGRESOS, ...]
-                        if row[0] and row[0] in ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SETIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]:
-                            ventas_str = str(row[1]).replace(',', '').strip()
+                        # row[0] es MES, row[1] es VENTAS
+                        mes_raw = str(row[0]).strip().upper() if row[0] else ""
+                        
+                        # Si es una fila de mes, actualizamos el mes detectado
+                        if mes_raw in meses_map and row[1]:
+                            mes_detectado = meses_map[mes_raw]
+                        
+                        # Si es la fila de TOTAL, extraemos el valor
+                        if "TOTAL" in mes_raw:
                             try:
-                                venta = float(ventas_str)
-                                total_ventas += venta
-                                # Actualizamos el mes detectado
-                                meses_map = {"ENERO":1, "FEBRERO":2, "MARZO":3, "ABRIL":4, "MAYO":5, "JUNIO":6, "JULIO":7, "AGOSTO":8, "SETIEMBRE":9, "OCTUBRE":10, "NOVIEMBRE":11, "DICIEMBRE":12}
-                                mes_detectado = meses_map[row[0]]
+                                total_ventas = float(str(row[1]).replace(',', '').replace(' ', ''))
                             except:
-                                continue
+                                pass
     return total_ventas, mes_detectado
