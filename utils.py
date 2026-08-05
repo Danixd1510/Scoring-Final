@@ -55,26 +55,30 @@ def extraer_ficha_ruc(pdf_path):
     return info
 
 def extraer_reporte_tributario(pdf_path):
-    meses_map = {
-        "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5,
-        "JUNIO": 6, "JULIO": 7, "AGOSTO": 8, "SETIEMBRE": 9, 
-        "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
-    }
     total_ventas = 0
-    ultimo_mes = 0
+    mes_detectado = 0
     
     with pdfplumber.open(pdf_path) as pdf:
-        # Buscamos la tabla en la primera página (donde está el cuadro)
-        page = pdf.pages[0]
-        text = page.extract_text()
-        
-        # Regex para capturar filas de la tabla: MES, VENTAS, INGRESOS, ESSALUD
-        # Patrón simple: Busca el nombre del mes y el número al lado
-        for mes, num in meses_map.items():
-            patron = rf"{mes}\s+(\d{1,3}(?:,\d{3})*)"
-            match = re.search(patron, text)
-            if match:
-                venta = float(match.group(1).replace(',', ''))
-                total_ventas += venta
-                ultimo_mes = num
-    return total_ventas, ultimo_mes
+        for page in pdf.pages:
+            tables = page.extract_tables()
+            for table in tables:
+                # Buscamos la tabla que contiene el "EJERCICIO CORRIENTE"
+                # Convertimos la tabla a texto para verificar si es la correcta
+                tabla_texto = " ".join([str(cell) for row in table for cell in row if cell])
+                
+                if "EJERCICIO CORRIENTE" in tabla_texto:
+                    # Iteramos sobre las filas de la tabla
+                    for row in table:
+                        # Buscamos filas que tengan un mes y un valor de ventas
+                        # Asumiendo estructura: [MES, VENTAS, INGRESOS, ...]
+                        if row[0] and row[0] in ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SETIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]:
+                            ventas_str = str(row[1]).replace(',', '').strip()
+                            try:
+                                venta = float(ventas_str)
+                                total_ventas += venta
+                                # Actualizamos el mes detectado
+                                meses_map = {"ENERO":1, "FEBRERO":2, "MARZO":3, "ABRIL":4, "MAYO":5, "JUNIO":6, "JULIO":7, "AGOSTO":8, "SETIEMBRE":9, "OCTUBRE":10, "NOVIEMBRE":11, "DICIEMBRE":12}
+                                mes_detectado = meses_map[row[0]]
+                            except:
+                                continue
+    return total_ventas, mes_detectado
