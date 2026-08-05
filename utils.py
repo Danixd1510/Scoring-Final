@@ -63,36 +63,31 @@ def extraer_reporte_tributario(pdf_path):
     
     total_ventas = 0
     mes_detectado = 0
-    en_bloque_2026 = False
     
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
-            # layout=True mantiene la alineación de las columnas visuales
-            text = page.extract_text(layout=True)
-            if not text: continue
-            
-            lineas = text.split('\n')
-            for linea in lineas:
-                # 1. Activamos el interruptor al encontrar 2026
-                if "2026" in linea:
-                    en_bloque_2026 = True
+            tables = page.extract_tables()
+            for table in tables:
+                # Convertimos toda la tabla a texto para verificar que es la de 2026
+                tabla_texto = " ".join([str(cell) for row in table for cell in row if cell])
                 
-                if en_bloque_2026:
-                    # 2. Buscamos el total del ejercicio
-                    if "TOTAL EJERCICIO" in linea:
-                        # Extraemos todos los números de la línea
-                        numeros = re.findall(r'[\d,]+', linea)
-                        if numeros:
-                            total_ventas = float(numeros[0].replace(',', ''))
-                            return total_ventas, mes_detectado # Salimos al encontrar el total
-                    
-                    # 3. Buscamos meses y actualizamos el último detectado
-                    for mes, num in meses_map.items():
-                        if mes in linea:
-                            # Extraemos números de la línea
-                            numeros = re.findall(r'[\d,]+', linea)
-                            # Si tiene números (ventas), este mes está declarado
-                            if numeros:
-                                mes_detectado = num
+                if "2026" in tabla_texto and "VENTAS" in tabla_texto:
+                    for row in table:
+                        if not row or row[0] is None: continue
+                        
+                        mes_raw = str(row[0]).strip().upper()
+                        
+                        # 1. Detectar el último mes con ventas en columna 1 (VENTAS)
+                        if mes_raw in meses_map:
+                            if row[1] and str(row[1]).strip() not in ["", "-"]:
+                                mes_detectado = meses_map[mes_raw]
+                        
+                        # 2. Detectar TOTAL en la fila que contiene TOTAL EJERCICIO
+                        if "TOTAL" in mes_raw:
+                            try:
+                                # row[1] es la columna VENTAS
+                                total_ventas = float(str(row[1]).replace(',', '').replace(' ', '').strip())
+                            except:
+                                pass
                                 
     return total_ventas, mes_detectado
