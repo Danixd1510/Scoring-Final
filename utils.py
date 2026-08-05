@@ -68,33 +68,16 @@ def extraer_reporte_tributario(pdf_path):
         for page in pdf.pages:
             tables = page.extract_tables()
             for table in tables:
-                # Vamos a recorrer la tabla buscando datos
-                tiene_meses = False
-                temp_total = 0
-                temp_mes = 0
-                
                 for row in table:
+                    # Saltamos si la fila es nula o no tiene nada en la primera columna
                     if not row or row[0] is None: continue
                     
                     mes_raw = str(row[0]).strip().upper()
                     
-                    # Detectar Mes
-                    if mes_raw in meses_map:
-                        if row[1] and str(row[1]).strip() not in ["", "-"]:
-                            temp_mes = meses_map[mes_raw]
-                            tiene_meses = True
-                            
-                    # Detectar TOTAL
-                    if "TOTAL" in mes_raw:
+                    # Verificamos si es una fila de mes válida y si tiene ventas
+                    if mes_raw in meses_map and row[1]:
                         val_str = str(row[1]).replace(',', '').strip()
-                        try:
-                            temp_total = float(val_str)
-                        except:
-                            pass
-                
-                # Si esta tabla tenía meses, es la que queremos
-                if tiene_meses:
-                    total_ventas = temp_total
-                    mes_detectado = temp_mes
-                    
-    return total_ventas, mes_detectado
+                        
+                        # Verificamos que sea un número real (que no sea texto como 'VENTAS')
+                        if val_str.replace('.', '').isdigit():
+                            venta
