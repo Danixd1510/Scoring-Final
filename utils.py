@@ -1,5 +1,6 @@
 import pdfplumber
 import re
+from datetime import datetime
 from mapping import MAPEO_CASILLAS
 
 def limpiar_valor(valor):
@@ -38,11 +39,6 @@ def extraer_datos_de_pdf(archivo_pdf):
                             datos_extraidos[code] = limpiar_valor(valor_encontrado)
                             
     return datos_extraidos
-
-
-import pdfplumber
-import re
-from datetime import datetime
 
 def extraer_ficha_ruc(pdf_path):
     info = {"RUC": "-", "Nombre": "-", "Inicio": "-"}
