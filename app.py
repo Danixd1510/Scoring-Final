@@ -62,6 +62,3 @@ if st.button("Generar Excel"):
             except Exception as e:
                 st.error(f"Error al procesar el archivo: {e}")
 
-if st.button("Limpiar / Nuevo Cliente"):
-    st.session_state.clear()
-    st.rerun()
