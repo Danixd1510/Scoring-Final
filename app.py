@@ -1,6 +1,6 @@
 import streamlit as st
 import openpyxl
-import os # Importante para verificar si el archivo existe
+import os
 from utils import extraer_datos_de_pdf, extraer_ficha_ruc, extraer_reporte_tributario
 from mapping import MAPEO_CASILLAS
 
@@ -32,33 +32,21 @@ pdf_2025 = st.file_uploader("Subir PDF 2025")
 archivos = {"2023": pdf_2023, "2024": pdf_2024, "2025": pdf_2025}
 
 if st.button("Generar Excel"):
-    if not cliente:
-        st.error("Por favor ingresa el nombre del cliente")
+    if not cliente or not os.path.exists("Scoring Final.xlsx"):
+        st.error("Error: Cliente no ingresado o archivo 'Scoring Final.xlsx' no encontrado.")
     else:
-        # VERIFICACIÓN DE SEGURIDAD: Comprobar si el archivo existe en el servidor
-        if not os.path.exists("Scoring Final.xlsx"):
-            st.error("Error crítico: No se encuentra 'Scoring Final.xlsx' en el servidor. Asegúrate de que el archivo esté en la raíz de tu repositorio de GitHub.")
-        else:
-            try:
-                wb = openpyxl.load_workbook("Scoring Final.xlsx")
-                
-                for anio, archivo in archivos.items():
-                    if archivo and anio in wb.sheetnames:
-                        ws = wb[anio]
-                        datos = extraer_datos_de_pdf(archivo)
-                        
-                        for casilla, valor in datos.items():
-                            celda = MAPEO_CASILLAS.get(casilla)
-                            if celda:
-                                if str(ws[celda].value).startswith("="):
-                                    continue
-                                ws[celda] = valor
-                                ws[celda].number_format = '_(* #,##0.00_);_(* -#,##0.00_);_(* "-"??_);_(@_)'
-                
-                nombre_final = f"Scoring Final - {cliente.replace('.', '')}.xlsx"
-                wb.save(nombre_final)
-                with open(nombre_final, "rb") as f:
-                    st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
-            except Exception as e:
-                st.error(f"Error al procesar el archivo: {e}")
-
+        wb = openpyxl.load_workbook("Scoring Final.xlsx")
+        for anio, archivo in archivos.items():
+            if archivo and anio in wb.sheetnames:
+                ws = wb[anio]
+                datos = extraer_datos_de_pdf(archivo)
+                for casilla, valor in datos.items():
+                    celda = MAPEO_CASILLAS.get(casilla)
+                    if celda and not str(ws[celda].value).startswith("="):
+                        ws[celda] = valor
+                        ws[celda].number_format = '_(* #,##0.00_);_(* -#,##0.00_);_(* "-"??_);_(@_)'
+        
+        nombre_final = f"Scoring Final - {cliente.replace('.', '')}.xlsx"
+        wb.save(nombre_final)
+        with open(nombre_final, "rb") as f:
+            st.download_button("📥 Descargar Excel", f, file_name=nombre_final)
