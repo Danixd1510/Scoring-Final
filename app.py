@@ -55,8 +55,6 @@ st.divider()
 st.header("Generar Reporte de Ratios")
 cliente = st.text_input("Nombre del Cliente")
 
-st.write("La aplicación usa la plantilla 'Scoring Final.xlsx' incluida en el repositorio.")
-
 pdf_2023 = st.file_uploader("Subir PDF 2023", type=["pdf"])
 pdf_2024 = st.file_uploader("Subir PDF 2024", type=["pdf"])
 pdf_2025 = st.file_uploader("Subir PDF 2025", type=["pdf"])
