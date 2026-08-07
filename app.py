@@ -3,6 +3,7 @@ import openpyxl
 import os
 import io
 import re
+from pathlib import Path
 from utils import extraer_datos_de_pdf, extraer_ficha_ruc, extraer_reporte_tributario
 from mapping import MAPEO_CASILLAS
 
@@ -27,6 +28,7 @@ def to_filelike(uploaded_file):
         return io.BytesIO(data)
     return uploaded_file
 
+# --- VISTA EN PANTALLA ---
 col1, col2 = st.columns(2)
 ficha_file = col1.file_uploader("Subir Ficha RUC", type=["pdf"])
 reporte_file = col2.file_uploader("Subir Reporte Tributario", type=["pdf"])
@@ -49,12 +51,13 @@ if reporte_file:
 
 st.divider()
 
+# --- GENERAR EXCEL (usa siempre la plantilla Scoring Final.xlsx del repo) ---
 st.header("Generar Reporte de Ratios")
 cliente = st.text_input("Nombre del Cliente")
-col_t1, col_t2 = st.columns(2)
-st.write("Plantilla: si quieres usar otra plantilla, súbela aquí; si no, se usará 'Scoring Final.xlsx' en el servidor.")
-plantilla_uploader = col_t1.file_uploader("Subir Plantilla (opcional) - Scoring Final.xlsx", type=["xlsx"])
-pdf_2023 = col_t2.file_uploader("Subir PDF 2023", type=["pdf"])
+
+st.write("La aplicación usa la plantilla 'Scoring Final.xlsx' incluida en el repositorio.")
+
+pdf_2023 = st.file_uploader("Subir PDF 2023", type=["pdf"])
 pdf_2024 = st.file_uploader("Subir PDF 2024", type=["pdf"])
 pdf_2025 = st.file_uploader("Subir PDF 2025", type=["pdf"])
 
@@ -64,31 +67,20 @@ if st.button("Generar Excel"):
     if not cliente:
         st.error("Error: Debes ingresar el nombre del cliente.")
     else:
-        plantilla_stream = None
-        if plantilla_uploader:
-            plantilla_stream = to_filelike(plantilla_uploader)
-        else:
-            if not os.path.exists("Scoring Final.xlsx"):
-                st.error("Error: No se encontró la plantilla 'Scoring Final.xlsx' en el servidor y no subiste una plantilla.")
-                st.stop()
-            else:
-                try:
-                    plantilla_stream = open("Scoring Final.xlsx", "rb")
-                except Exception as e:
-                    st.error(f"No se pudo abrir la plantilla local: {e}")
-                    st.stop()
+        # Buscar la plantilla junto al archivo app.py (más robusto en despliegues)
+        base_path = Path(__file__).parent
+        plantilla_path = base_path / "Scoring Final.xlsx"
+
+        if not plantilla_path.exists():
+            st.error(f"Error: No se encontró la plantilla '{plantilla_path.name}' en el repositorio.")
+            st.stop()
 
         try:
-            wb = openpyxl.load_workbook(plantilla_stream)
+            with open(plantilla_path, "rb") as f:
+                wb = openpyxl.load_workbook(f)
         except Exception as e:
             st.error(f"No se pudo cargar la plantilla: {e}")
             st.stop()
-        finally:
-            try:
-                if hasattr(plantilla_stream, "close") and plantilla_uploader is None:
-                    plantilla_stream.close()
-            except:
-                pass
 
         total_reemplazadas = 0
         detalles_por_anio = {}
@@ -141,7 +133,7 @@ if st.button("Generar Excel"):
                     cell_obj.value = valor
 
                 try:
-                    cell_obj.number_format = '_(* #,##0.00_);_(* -#,##0.00_);_(* \"-\"\"??_);_(@_)'
+                    cell_obj.number_format = '_(* #,##0.00_);_(* -#,##0.00_);_(* "-"??_);_(@_)'
                 except:
                     pass
 
