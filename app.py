@@ -44,11 +44,13 @@ if ficha_file:
 if reporte_file:
     reporte_stream = to_filelike(reporte_file)
     try:
-        ventas, mes = extraer_reporte_tributario(reporte_stream)
+        ventas, mes, trace = extraer_reporte_tributario(reporte_stream, debug=True)
+        st.write("DEBUG trace (tablas candidatas y meses detectados):")
+        st.write(trace)  # muestra la traza
         st.info(f"**Ventas Totales:** S/ {ventas:,.2f} | **Mes detectado:** {mes if mes else 'N/D'}")
     except Exception as e:
         st.error(f"No se pudo extraer reporte tributario: {e}")
-
+        
 st.divider()
 
 # --- GENERAR EXCEL (usa siempre la plantilla Scoring Final.xlsx del repo) ---
