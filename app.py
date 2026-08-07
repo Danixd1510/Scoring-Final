@@ -4,7 +4,7 @@ import os
 import io
 import re
 from pathlib import Path
-from utils import extraer_datos_de_pdf, extraer_ficha_ruc, extraer_reporte_tributario
+from utils import extraer_datos_de_pdf, extraer_ficha_ruc
 from mapping import MAPEO_CASILLAS
 
 st.set_page_config(page_title="Scoring Financiero", layout="wide")
@@ -28,34 +28,26 @@ def to_filelike(uploaded_file):
         return io.BytesIO(data)
     return uploaded_file
 
-# --- VISTA EN PANTALLA ---
-col1, col2 = st.columns(2)
+# --- VISTA EN PANTALLA: SOLO FICHA RUC ---
+col1 = st.columns(1)[0]
 ficha_file = col1.file_uploader("Subir Ficha RUC", type=["pdf"])
-reporte_file = col2.file_uploader("Subir Reporte Tributario", type=["pdf"])
 
 if ficha_file:
     ficha_stream = to_filelike(ficha_file)
     try:
         info = extraer_ficha_ruc(ficha_stream)
-        st.success(f"**Empresa:** {info.get('Nombre','-')} | **RUC:** {info.get('RUC','-')} | **Inicio:** {info.get('Inicio','-')}")
+        # Mostrar exactamente en el formato solicitado:
+        st.success(f"Empresa: {info.get('Nombre','-')} | RUC: {info.get('RUC','-')} | Inicio: {info.get('Inicio','-')}")
     except Exception as e:
         st.error(f"No se pudo extraer ficha RUC: {e}")
 
-if reporte_file:
-    reporte_stream = to_filelike(reporte_file)
-    try:
-        ventas, mes, trace = extraer_reporte_tributario(reporte_stream, debug=True)
-        st.write("DEBUG trace (tablas candidatas y meses detectados):")
-        st.write(trace)  # muestra la traza
-        st.info(f"**Ventas Totales:** S/ {ventas:,.2f} | **Mes detectado:** {mes if mes else 'N/D'}")
-    except Exception as e:
-        st.error(f"No se pudo extraer reporte tributario: {e}")
-        
 st.divider()
 
-# --- GENERAR EXCEL (usa siempre la plantilla Scoring Final.xlsx del repo) ---
+# --- GENERAR EXCEL ---
 st.header("Generar Reporte de Ratios")
 cliente = st.text_input("Nombre del Cliente")
+
+st.write("La aplicación usa la plantilla 'Scoring Final.xlsx' incluida en el repositorio.")
 
 pdf_2023 = st.file_uploader("Subir PDF 2023", type=["pdf"])
 pdf_2024 = st.file_uploader("Subir PDF 2024", type=["pdf"])
@@ -67,7 +59,6 @@ if st.button("Generar Excel"):
     if not cliente:
         st.error("Error: Debes ingresar el nombre del cliente.")
     else:
-        # Buscar la plantilla junto al archivo app.py (más robusto en despliegues)
         base_path = Path(__file__).parent
         plantilla_path = base_path / "Scoring Final.xlsx"
 
