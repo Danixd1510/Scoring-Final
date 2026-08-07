@@ -147,79 +147,133 @@ def extraer_ficha_ruc(pdf_path):
 
     return info
 
-def extraer_reporte_tributario(pdf_path):
+def extraer_reporte_tributario(pdf_path, debug=False):
+    """
+    Extrae el total de ventas acumulado hasta el último mes con actividad
+    y el número del último mes (1-12).
+    Si debug=True, devuelve (total_ventas, ultimo_mes, trace) donde trace es info de diagnóstico.
+    """
     meses_map = {
         "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5,
         "JUNIO": 6, "JULIO": 7, "AGOSTO": 8, "SETIEMBRE": 9, "SEPTIEMBRE": 9,
         "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
     }
+
     total_ventas = 0.0
     ultimo_mes = 0
+    trace = {"candidatas": [], "meses_encontrados": []}
 
     with pdfplumber.open(pdf_path) as pdf:
         page = pdf.pages[0]
+        page_text = (page.extract_text() or "").upper()
+
         tables = []
-        t = page.extract_table()
-        if t:
-            tables.append(t)
         try:
             ts = page.extract_tables()
             if ts:
                 tables.extend(ts)
         except:
             pass
+        try:
+            t = page.extract_table()
+            if t:
+                tables.append(t)
+        except:
+            pass
 
-        for table in tables:
-            for row in table:
-                row_texts = ["" if c is None else str(c).strip() for c in row]
-                joined = " ".join(row_texts)
-                norm = normalize_text(joined)
-                if "TOTAL" in norm:
-                    for cell in reversed(row_texts):
-                        if cell:
-                            val = limpiar_valor(cell)
-                            if val != 0.0:
-                                total_ventas = val
-                                break
-                for i, cell in enumerate(row_texts):
-                    if not cell:
-                        continue
-                    cell_norm = normalize_text(cell)
-                    if cell_norm in meses_map:
-                        for j in range(i + 1, min(len(row_texts), i + 4)):
-                            cand = row_texts[j]
-                            if cand:
-                                val = limpiar_valor(cand)
-                                if val != 0.0:
-                                    ultimo_mes = max(ultimo_mes, meses_map[cell_norm])
-                                    break
+        def norm(s):
+            return "" if s is None else re.sub(r"\s+", " ", str(s).strip()).upper()
 
-        if total_ventas == 0.0:
+        candidates = []
+        for ti, table in enumerate(tables):
+            table_text = " ".join([norm(cell) for row in table for cell in (row or []) if cell])
+            has_month = any(m in table_text for m in meses_map.keys())
+            has_ventas = "VENTAS" in table_text
+            has_corriente = "CORRIENTE" in table_text or "EJERCICIO CORRIENTE" in table_text or "EJERCICIO" in table_text
+
+            if has_month and (has_ventas or has_corriente or ("2026" in table_text) or ("2025" in table_text)):
+                candidates.append((ti, table, table_text, has_month, has_ventas, has_corriente))
+
+        if not candidates:
+            for ti, table in enumerate(tables):
+                table_text = " ".join([norm(cell) for row in table for cell in (row or []) if cell])
+                if any(m in table_text for m in meses_map.keys()):
+                    candidates.append((ti, table, table_text, True, "VENTAS" in table_text, False))
+
+        procesada = False
+        for ti, table, table_text, has_month, has_ventas, has_corriente in candidates:
+            if debug:
+                trace["candidatas"].append({"index": ti, "table_text": table_text[:400], "has_ventas": has_ventas, "has_corriente": has_corriente})
+
+            ventas_col = None
+            header_candidates = table[:3] if len(table) >= 3 else table
+            for row in header_candidates:
+                for idx, cell in enumerate(row):
+                    if cell and "VENTAS" in norm(cell):
+                        ventas_col = idx
+                        break
+                if ventas_col is not None:
+                    break
+            if ventas_col is None:
+                ventas_col = 1 if any(len(r) > 1 for r in table) else 0
+
             suma = 0.0
-            for table in tables:
-                for row in table:
-                    row_texts = ["" if c is None else str(c).strip() for c in row]
-                    for i, cell in enumerate(row_texts):
-                        if not cell:
-                            continue
-                        cell_norm = normalize_text(cell)
-                        if cell_norm in meses_map:
-                            for j in range(i + 1, min(len(row_texts), i + 4)):
-                                cand = row_texts[j]
-                                if cand:
-                                    val = limpiar_valor(cand)
-                                    suma += val
-                                    break
-            if suma > 0.0:
-                total_ventas = suma
+            local_ultimo = 0
+            meses_encontrados = []
+            for row in table:
+                if not row:
+                    continue
+                mes_nombre = None
+                for idx_check in range(0, min(3, len(row))):
+                    c = row[idx_check]
+                    if c:
+                        cn = norm(c)
+                        for mn in meses_map.keys():
+                            # coincidencia flexible
+                            if mn in cn.split() or cn.startswith(mn + " ") or cn == mn:
+                                mes_nombre = mn
+                                mes_col_idx = idx_check
+                                break
+                    if mes_nombre:
+                        break
 
-        if total_ventas == 0.0 or ultimo_mes == 0:
-            page_text = page.extract_text() or ""
+                if mes_nombre:
+                    ventas_val_raw = None
+                    if ventas_col < len(row) and row[ventas_col]:
+                        ventas_val_raw = row[ventas_col]
+                    else:
+                        for j in range(mes_col_idx + 1, min(len(row), mes_col_idx + 5)):
+                            if row[j] and not any(mn in norm(row[j]) for mn in meses_map.keys()):
+                                ventas_val_raw = row[j]
+                                break
+
+                    if ventas_val_raw:
+                        val = limpiar_valor(ventas_val_raw)
+                        meses_encontrados.append((mes_nombre, val))
+                        if val != 0.0:
+                            suma += val
+                            local_ultimo = max(local_ultimo, meses_map[mes_nombre])
+
+            if meses_encontrados:
+                total_ventas = suma
+                ultimo_mes = local_ultimo
+                trace["meses_encontrados"] = meses_encontrados
+                procesada = True
+                break
+
+        if not procesada:
             m = re.search(r"TOTAL[^\d\-]*([0-9\.,\-\s]+)", page_text, flags=re.IGNORECASE)
             if m:
                 total_ventas = limpiar_valor(m.group(1))
+            ultimo = 0
             for mes_name, num in meses_map.items():
-                if mes_name in normalize_text(page_text):
-                    ultimo_mes = max(ultimo_mes, num)
+                if mes_name in page_text:
+                    ultimo = max(ultimo, num)
+            ultimo_mes = ultimo
+            trace["fallback_total"] = total_ventas
+            trace["fallback_ultimo_mes"] = ultimo_mes
 
+    if debug:
+        return total_ventas, ultimo_mes, trace
     return total_ventas, ultimo_mes
+    
