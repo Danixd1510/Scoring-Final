@@ -53,9 +53,9 @@ def limpiar_valor(valor):
         val = -abs(val)
     return val
 
+# -- extraer_datos_de_pdf y otras funciones que uses (mantenlas si ya las tienes) --
 def extraer_datos_de_pdf(archivo_pdf):
     datos_extraidos = {}
-
     norm_to_key = {}
     for k in MAPEO_CASILLAS.keys():
         norm = normalize_text(k)
@@ -117,6 +117,7 @@ def extraer_datos_de_pdf(archivo_pdf):
 
     return datos_extraidos
 
+# ---- nueva versión robusta de extraer_ficha_ruc con limpieza de nombre ----
 def extraer_ficha_ruc(pdf_path):
     info = {"RUC": "-", "Nombre": "-", "Inicio": "-"}
     with pdfplumber.open(pdf_path) as pdf:
@@ -127,16 +128,39 @@ def extraer_ficha_ruc(pdf_path):
                 texts.append(t)
         text = "\n".join(texts)
 
+        # RUC: búsqueda tolerante
         ruc_match = re.search(r"\bRUC\b[\s:\-]*([0-9]{11})", text, flags=re.IGNORECASE)
         if not ruc_match:
             ruc_match = re.search(r"FICHA\s+RUC[\s:\-]*([0-9]{11})", text, flags=re.IGNORECASE)
         if ruc_match:
             info["RUC"] = ruc_match.group(1)
 
-        nombre_match = re.search(r"(RAZON SOCIAL|APELLIDOS Y NOMBRES|NOMBRE O RAZON SOCIAL)[\s:\-]*([^\n\r]+)", text, flags=re.IGNORECASE)
+        # Nombre / Razón social: buscar varias etiquetas posibles
+        nombre_match = re.search(r"(RAZON SOCIAL|APELLIDOS Y NOMBRES|NOMBRE O RAZON SOCIAL|EMPRESA|NOMBRE)[\s:\-]*([^\n\r]+)", text, flags=re.IGNORECASE)
         if nombre_match:
-            info["Nombre"] = nombre_match.group(2).strip()
+            raw_name = nombre_match.group(2).strip()
+        else:
+            # fallback: intentar capturar la línea que sigue a 'Razón Social' o 'Nombre'
+            m = re.search(r"(Raz[oó]n Social|Apellidos y Nombres|Nombre)[\s:\-]*\n?\s*([^\n\r]+)", text, flags=re.IGNORECASE)
+            raw_name = m.group(2).strip() if m else "-"
 
+        # Normalizamos y limpiamos el nombre para quitar etiquetas sobrantes
+        name = raw_name.strip()
+        # Si hay dos puntos ':' en la cadena, tomar lo que esté después del último, porque a veces se captura la etiqueta
+        if ":" in name:
+            after_colon = name.split(":")[-1].strip()
+            # si lo que queda parece un nombre razonable, lo usamos
+            if len(after_colon) > 0 and len(after_colon) < len(name):
+                name = after_colon
+
+        # remover prefijos comunes que hayan quedado
+        name = re.sub(r'^(EMPRESA|EMPRESA[:\s\-]*|RAZON SOCIAL[:\s\-]*|APELLIDOS Y NOMBRES[:\s\-]*|NOMBRE O RAZON SOCIAL[:\s\-]*|NOMBRE[:\s\-]*|O RAZON SOCIAL[:\s\-]*|Ó RAZON SOCIAL[:\s\-]*)', '', name, flags=re.IGNORECASE)
+        # quitar comillas o caracteres raros iniciales
+        name = re.sub(r'^[\s\-\:\"]+', '', name).strip()
+
+        info["Nombre"] = name if name else "-"
+
+        # Fecha de inicio: soportar varios formatos
         fecha_match = re.search(r"(FECHA DE INICIO DE ACTIVIDADES|FECHA DE INICIO)[\s:\-]*([0-3]?\d[\/\-][0-1]?\d[\/\-][12]\d{3})", text, flags=re.IGNORECASE)
         if fecha_match:
             info["Inicio"] = fecha_match.group(2).strip()
@@ -146,134 +170,3 @@ def extraer_ficha_ruc(pdf_path):
                 info["Inicio"] = fecha_match2.group(1)
 
     return info
-
-def extraer_reporte_tributario(pdf_path, debug=False):
-    """
-    Extrae el total de ventas acumulado hasta el último mes con actividad
-    y el número del último mes (1-12).
-    Si debug=True, devuelve (total_ventas, ultimo_mes, trace) donde trace es info de diagnóstico.
-    """
-    meses_map = {
-        "ENERO": 1, "FEBRERO": 2, "MARZO": 3, "ABRIL": 4, "MAYO": 5,
-        "JUNIO": 6, "JULIO": 7, "AGOSTO": 8, "SETIEMBRE": 9, "SEPTIEMBRE": 9,
-        "OCTUBRE": 10, "NOVIEMBRE": 11, "DICIEMBRE": 12
-    }
-
-    total_ventas = 0.0
-    ultimo_mes = 0
-    trace = {"candidatas": [], "meses_encontrados": []}
-
-    with pdfplumber.open(pdf_path) as pdf:
-        page = pdf.pages[0]
-        page_text = (page.extract_text() or "").upper()
-
-        tables = []
-        try:
-            ts = page.extract_tables()
-            if ts:
-                tables.extend(ts)
-        except:
-            pass
-        try:
-            t = page.extract_table()
-            if t:
-                tables.append(t)
-        except:
-            pass
-
-        def norm(s):
-            return "" if s is None else re.sub(r"\s+", " ", str(s).strip()).upper()
-
-        candidates = []
-        for ti, table in enumerate(tables):
-            table_text = " ".join([norm(cell) for row in table for cell in (row or []) if cell])
-            has_month = any(m in table_text for m in meses_map.keys())
-            has_ventas = "VENTAS" in table_text
-            has_corriente = "CORRIENTE" in table_text or "EJERCICIO CORRIENTE" in table_text or "EJERCICIO" in table_text
-
-            if has_month and (has_ventas or has_corriente or ("2026" in table_text) or ("2025" in table_text)):
-                candidates.append((ti, table, table_text, has_month, has_ventas, has_corriente))
-
-        if not candidates:
-            for ti, table in enumerate(tables):
-                table_text = " ".join([norm(cell) for row in table for cell in (row or []) if cell])
-                if any(m in table_text for m in meses_map.keys()):
-                    candidates.append((ti, table, table_text, True, "VENTAS" in table_text, False))
-
-        procesada = False
-        for ti, table, table_text, has_month, has_ventas, has_corriente in candidates:
-            if debug:
-                trace["candidatas"].append({"index": ti, "table_text": table_text[:400], "has_ventas": has_ventas, "has_corriente": has_corriente})
-
-            ventas_col = None
-            header_candidates = table[:3] if len(table) >= 3 else table
-            for row in header_candidates:
-                for idx, cell in enumerate(row):
-                    if cell and "VENTAS" in norm(cell):
-                        ventas_col = idx
-                        break
-                if ventas_col is not None:
-                    break
-            if ventas_col is None:
-                ventas_col = 1 if any(len(r) > 1 for r in table) else 0
-
-            suma = 0.0
-            local_ultimo = 0
-            meses_encontrados = []
-            for row in table:
-                if not row:
-                    continue
-                mes_nombre = None
-                for idx_check in range(0, min(3, len(row))):
-                    c = row[idx_check]
-                    if c:
-                        cn = norm(c)
-                        for mn in meses_map.keys():
-                            # coincidencia flexible
-                            if mn in cn.split() or cn.startswith(mn + " ") or cn == mn:
-                                mes_nombre = mn
-                                mes_col_idx = idx_check
-                                break
-                    if mes_nombre:
-                        break
-
-                if mes_nombre:
-                    ventas_val_raw = None
-                    if ventas_col < len(row) and row[ventas_col]:
-                        ventas_val_raw = row[ventas_col]
-                    else:
-                        for j in range(mes_col_idx + 1, min(len(row), mes_col_idx + 5)):
-                            if row[j] and not any(mn in norm(row[j]) for mn in meses_map.keys()):
-                                ventas_val_raw = row[j]
-                                break
-
-                    if ventas_val_raw:
-                        val = limpiar_valor(ventas_val_raw)
-                        meses_encontrados.append((mes_nombre, val))
-                        if val != 0.0:
-                            suma += val
-                            local_ultimo = max(local_ultimo, meses_map[mes_nombre])
-
-            if meses_encontrados:
-                total_ventas = suma
-                ultimo_mes = local_ultimo
-                trace["meses_encontrados"] = meses_encontrados
-                procesada = True
-                break
-
-        if not procesada:
-            m = re.search(r"TOTAL[^\d\-]*([0-9\.,\-\s]+)", page_text, flags=re.IGNORECASE)
-            if m:
-                total_ventas = limpiar_valor(m.group(1))
-            ultimo = 0
-            for mes_name, num in meses_map.items():
-                if mes_name in page_text:
-                    ultimo = max(ultimo, num)
-            ultimo_mes = ultimo
-            trace["fallback_total"] = total_ventas
-            trace["fallback_ultimo_mes"] = ultimo_mes
-
-    if debug:
-        return total_ventas, ultimo_mes, trace
-    return total_ventas, ultimo_mes
-    
